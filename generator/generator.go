@@ -924,7 +924,7 @@ func wrapImported(file *FileDescriptor, g *Generator) (sl []*ImportedDescriptor)
 func extractComments(file *FileDescriptor) {
 	file.comments = make(map[string]*descriptor.SourceCodeInfo_Location)
 	for _, loc := range file.GetSourceCodeInfo().GetLocation() {
-		if loc.LeadingComments == nil {
+		if loc.LeadingComments == nil && loc.TrailingComments == nil {
 			continue
 		}
 		var p []string
@@ -1115,28 +1115,37 @@ func (g *Generator) generate(file *FileDescriptor) {
 	msgs := map[string]*descriptor.DescriptorProto{}
 	msgsIdx := map[string]int{}
 	for idx, msg := range file.MessageType {
-		msgs["."+file.GetPackage()+"."+msg.GetName()] = msg
-		msgsIdx[msg.GetName()] = idx
+		msgFullName := "." + file.GetPackage() + "." + msg.GetName()
+		msgs[msgFullName] = msg
+		msgsIdx[msgFullName] = idx
 	}
 
-	for _, service := range g.file.Service {
-		g.P("// service:", service.Name)
+	jsonFieldName := func(field *descriptor.FieldDescriptorProto) string {
+		fname := field.GetJsonName()
+		if len(fname) == 0 {
+			fname = field.GetName()
+		}
+		return fname
+	}
 
-		for idx, method := range service.Method {
+	for sIdx, service := range g.file.Service {
+		g.P("// service:", service.Name)
+		g.PrintComments(fmt.Sprintf("6,%d", sIdx))
+
+		for _, method := range service.Method {
 
 			g.P("-------------------------------------------------------------------")
 			g.P("//cgi: ", method.Name)
 			g.P("//")
-
 			g.P("//请求体:")
 			g.P("|参数名|参数描述|是否可选|默认值|")
 			g.P("|:---:|:-----:|:----:|:---:|")
-			req := msgs[method.GetInputType()]
-			for _, field := range req.Field {
+			req, _ := msgs[method.GetInputType()]
+			for idx, field := range req.Field {
 				path := fmt.Sprintf("4,%d,2,%d", msgsIdx[method.GetInputType()], idx)
-				comments, _ := g.makeComments(path)
+				comments, _ := g.xmakeComments(path)
 				label := strings.TrimPrefix(field.GetLabel().String(), "LABEL_")
-				g.P(fmt.Sprintf("|%s|%s|%s|%s|", field.GetName(), comments, label, field.GetDefaultValue()))
+				g.P(fmt.Sprintf("|%s|%s|%s|%s|", jsonFieldName(field), comments, label, field.GetDefaultValue()))
 			}
 			g.P()
 
@@ -1144,10 +1153,11 @@ func (g *Generator) generate(file *FileDescriptor) {
 			g.P("|参数名|参数描述|是否可选|默认值|")
 			g.P("|:---:|:-----:|:----:|:---:|")
 			rsp := msgs[method.GetOutputType()]
-			for _, field := range rsp.Field {
+			for idx, field := range rsp.Field {
 				path := fmt.Sprintf("4,%d,2,%d", msgsIdx[method.GetOutputType()], idx)
-				comments, _ := g.makeComments(path)
-				g.P(fmt.Sprintf("|%s|%s|%s|%s|", field.JsonName, comments, field.GetLabel(), field.GetDefaultValue()))
+				comments, _ := g.xmakeComments(path)
+				label := strings.TrimPrefix(field.GetLabel().String(), "LABEL_")
+				g.P(fmt.Sprintf("|%s|%s|%s|%s|", jsonFieldName(field), comments, label, field.GetDefaultValue()))
 			}
 		}
 	}
@@ -1193,13 +1203,33 @@ func (g *Generator) makeComments(path string) (string, bool) {
 	if !ok {
 		return "", false
 	}
+
+	comments := strings.TrimSuffix(loc.GetLeadingComments(), "\n")
+	if len(comments) == 0 {
+		comments = strings.TrimSuffix(loc.GetTrailingComments(), "\n")
+	}
+
 	w := new(bytes.Buffer)
 	nl := ""
-	for _, line := range strings.Split(strings.TrimSuffix(loc.GetLeadingComments(), "\n"), "\n") {
+
+	for _, line := range strings.Split(comments, "\n") {
 		fmt.Fprintf(w, "%s//%s", nl, line)
 		nl = "\n"
 	}
+
 	return w.String(), true
+}
+
+// makeComments generates the comment string for the field, no "\n" at the end
+func (g *Generator) xmakeComments(path string) (string, bool) {
+	loc, ok := g.file.comments[path]
+
+	if !ok {
+		return "", false
+	}
+
+	comments := loc.GetLeadingComments() + loc.GetTrailingComments()
+	return strings.ReplaceAll(comments, "\n", ""), true
 }
 
 func (g *Generator) fileByName(filename string) *FileDescriptor {
