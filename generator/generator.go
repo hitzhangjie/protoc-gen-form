@@ -301,13 +301,13 @@ func (d *FileDescriptor) goPackageOption() (impPath GoImportPath, pkg GoPackageN
 	return "", cleanPackageName(opt), true
 }
 
-// goFileName returns the output name for the generated Go file.
-func (d *FileDescriptor) goFileName(pathType pathType) string {
+// markdownFileName returns the output name for the generated Go file.
+func (d *FileDescriptor) markdownFileName(pathType pathType) string {
 	name := *d.Name
 	if ext := path.Ext(name); ext == ".proto" || ext == ".protodevel" {
 		name = name[:len(name)-len(ext)]
 	}
-	name += ".pb.go"
+	name += ".md"
 
 	if pathType == pathTypeSourceRelative {
 		return name
@@ -1089,19 +1089,11 @@ func (g *Generator) GenerateAllFiles() {
 		if !g.writeOutput {
 			continue
 		}
-		fname := file.goFileName(g.pathType)
+		fname := file.markdownFileName(g.pathType)
 		g.Response.File = append(g.Response.File, &plugin.CodeGeneratorResponse_File{
 			Name:    proto.String(fname),
 			Content: proto.String(g.String()),
 		})
-		if g.annotateCode {
-			// Store the generated code annotations in text, as the protoc plugin protocol requires that
-			// strings contain valid UTF-8.
-			g.Response.File = append(g.Response.File, &plugin.CodeGeneratorResponse_File{
-				Name:    proto.String(file.goFileName(g.pathType) + ".meta"),
-				Content: proto.String(proto.CompactTextString(&descriptor.GeneratedCodeInfo{Annotation: g.annotations})),
-			})
-		}
 	}
 }
 
@@ -1123,7 +1115,7 @@ func (g *Generator) generate(file *FileDescriptor) {
 	msgs := map[string]*descriptor.DescriptorProto{}
 	msgsIdx := map[string]int{}
 	for idx, msg := range file.MessageType {
-		msgs[msg.GetName()] = msg
+		msgs["."+file.GetPackage()+"."+msg.GetName()] = msg
 		msgsIdx[msg.GetName()] = idx
 	}
 
@@ -1131,6 +1123,7 @@ func (g *Generator) generate(file *FileDescriptor) {
 		g.P("// service:", service.Name)
 
 		for idx, method := range service.Method {
+
 			g.P("-------------------------------------------------------------------")
 			g.P("//cgi: ", method.Name)
 			g.P("//")
@@ -1142,7 +1135,8 @@ func (g *Generator) generate(file *FileDescriptor) {
 			for _, field := range req.Field {
 				path := fmt.Sprintf("4,%d,2,%d", msgsIdx[method.GetInputType()], idx)
 				comments, _ := g.makeComments(path)
-				g.P(fmt.Sprintf("|%s|%s|%s|%s|", field.JsonName, comments, field.GetLabel(), field.GetDefaultValue()))
+				label := strings.TrimPrefix(field.GetLabel().String(), "LABEL_")
+				g.P(fmt.Sprintf("|%s|%s|%s|%s|", field.GetName(), comments, label, field.GetDefaultValue()))
 			}
 			g.P()
 
