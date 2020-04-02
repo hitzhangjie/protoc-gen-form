@@ -1129,14 +1129,15 @@ func (g *Generator) generate(file *FileDescriptor) {
 	}
 
 	for sIdx, service := range g.file.Service {
-		g.P("// service:", service.Name)
+		g.P("//service:", service.Name)
 		g.PrintComments(fmt.Sprintf("6,%d", sIdx))
+		g.P()
 
 		for _, method := range service.Method {
 
 			g.P("-------------------------------------------------------------------")
 			g.P("//cgi: ", method.Name)
-			g.P("//")
+			g.P()
 			g.P("//请求体:")
 			g.P("|参数名|参数描述|是否可选|默认值|")
 			g.P("|:---:|:-----:|:----:|:---:|")
