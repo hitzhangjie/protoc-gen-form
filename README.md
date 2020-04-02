@@ -1,13 +1,15 @@
-# protoc-gen-gorpc
+# protoc-gen-form
+generate web form description based on google protobuf
 
 ## Introduction
-protoc-gen-gorpc is a protoc plugin for generating [gorpc](https://github.com/hitzhangjie/go-rpc) code.
+protoc-gen-form is a protoc plugin for generating web form description, 
+to ease the communication btw web and backend developers.
 
 ## Usage
 how to use this plugin:
 
 ```
-protoc --gorpc_out=plugins=gorpc:. ${filename}.proto
+protoc --form_out=. ${filename}.proto
 ```
 
 ## Installation
@@ -15,9 +17,6 @@ protoc --gorpc_out=plugins=gorpc:. ${filename}.proto
 you can install this plugin by run:
 
 ```
-go install github.com/hitzhangjie/protoc-gen-gorpc
+go install github.com/hitzhangjie/protoc-gen-form
 ```
 
-## More
-
-please watch `go-rpc` project, it's a simple and beautiful rpc framework written in go.
