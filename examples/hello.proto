@@ -1,0 +1,10 @@
+syntax = "proto3";
+package hello;
+option go_package="github.com/hello";
+
+message Request{}
+message Response{}
+
+service HelloSvr {
+    rpc Hello(Request) returns(Response);
+}
